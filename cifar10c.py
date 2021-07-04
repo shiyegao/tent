@@ -1,5 +1,5 @@
 import logging
-
+import math
 import torch
 import torch.optim as optim
 
@@ -45,10 +45,27 @@ def evaluate(description):
                                            severity, cfg.DATA_DIR, False,
                                            [corruption_type])
             x_test, y_test = x_test.cuda(), y_test.cuda()
-            acc = accuracy(model, x_test, y_test, cfg.TEST.BATCH_SIZE)
-            err = 1. - acc
-            logger.info(f"error % [{corruption_type}{severity}]: {err:.2%}")
+            
+            
+            
+            batch_size = cfg.TEST.BATCH_SIZE
+            n_batches = math.ceil(x_test.shape[0] / batch_size)
+            correct = 0.
+            # updating for the online time_i data and output
+            for counter in range(n_batches):
+                x_curr = x_test[counter * batch_size:(counter + 1) *
+                        batch_size]
+                y_curr = y_test[counter * batch_size:(counter + 1) *
+                        batch_size]
+                output = model(x_curr)
+                acc = (output.max(1)[1] == y_curr).float().sum().item()
+                correct += acc
 
+                acc = acc / batch_size
+                err = 1. - acc
+                logger.info(f"error % [{corruption_type}{severity}]: {err:.2%}")
+            error = 1. - correct/x_test[0]
+            logger.info(f"error % [{corruption_type}{severity}]: {error:.2%}")
 
 def setup_source(model):
     """Set up the baseline source model without adaptation."""
